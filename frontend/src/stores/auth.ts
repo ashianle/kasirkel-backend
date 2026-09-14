@@ -4,7 +4,8 @@ import apiClient from '@/api/client'
 export interface User {
   id_user: number
   username: string
-  nama: string
+  nama?: string
+  nama_lengkap?: string
   role?: string
   id_sekolah: number
 }

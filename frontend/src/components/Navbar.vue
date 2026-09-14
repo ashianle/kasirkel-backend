@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { 
@@ -6,80 +6,109 @@ import {
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
+  Receipt,
   LogOut, 
-  User as UserIcon 
+  User as UserIcon
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/login')
+  if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+    await authStore.logout()
+    router.push('/login')
+  }
 }
 </script>
 
 <template>
-  <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <!-- Logo & Title -->
+  <header class="bg-white border-b border-slate-200/80 sticky top-0 z-40 shadow-2xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Brand & Navigation -->
       <div class="flex items-center gap-8">
-        <router-link to="/" class="flex items-center gap-2 font-bold text-xl text-emerald-400 hover:text-emerald-300">
-          <Store class="w-6 h-6" />
-          <span>KasirKel</span>
+        <!-- Logo -->
+        <router-link to="/pos" class="flex items-center gap-2.5 font-bold text-slate-900 group">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:bg-indigo-700 transition">
+            <Store class="w-5 h-5" />
+          </div>
+          <div class="leading-none">
+            <span class="text-base tracking-tight font-black text-slate-900">KasirKel</span>
+            <div class="text-[10px] font-semibold text-indigo-600 tracking-wider uppercase mt-0.5">Point of Sale</div>
+          </div>
         </router-link>
 
-        <!-- Nav Links -->
+        <!-- Navigation Tabs -->
         <nav class="hidden md:flex items-center gap-1">
           <router-link
+            to="/pos"
+            class="px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+            :class="$route.path === '/pos' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+          >
+            <ShoppingCart class="w-4 h-4" />
+            <span>Kasir (POS)</span>
+          </router-link>
+
+          <router-link
             to="/"
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            :class="$route.path === '/' ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+            class="px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+            :class="$route.path === '/' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
           >
             <LayoutDashboard class="w-4 h-4" />
-            Dashboard
+            <span>Dashboard</span>
           </router-link>
 
           <router-link
             to="/barang"
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            :class="$route.path === '/barang' ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+            class="px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+            :class="$route.path === '/barang' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
           >
             <Package class="w-4 h-4" />
-            Data Barang
+            <span>Data Barang</span>
           </router-link>
 
           <router-link
             to="/penjualan"
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            :class="$route.path === '/penjualan' ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+            class="px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+            :class="$route.path === '/penjualan' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
           >
-            <ShoppingCart class="w-4 h-4" />
-            Transaksi Penjualan
+            <Receipt class="w-4 h-4" />
+            <span>Riwayat Transaksi</span>
           </router-link>
         </nav>
       </div>
 
-      <!-- User & Logout -->
-      <div class="flex items-center gap-4">
-        <div class="hidden sm:flex items-center gap-2 text-sm text-slate-300">
-          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400">
-            <UserIcon class="w-4 h-4" />
-          </div>
-          <div>
-            <div class="font-medium text-white">{{ authStore.user?.nama || authStore.user?.username || 'Kasir' }}</div>
-            <div class="text-xs text-slate-400">Sekolah ID: {{ authStore.user?.id_sekolah || '-' }}</div>
-          </div>
+      <!-- Right Header Elements -->
+      <div class="flex items-center gap-3">
+        <!-- DB Badge -->
+        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-semibold">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>MySQL Ready</span>
         </div>
 
-        <button
-          @click="handleLogout"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 border border-rose-900/50 transition-colors"
-          title="Keluar"
-        >
-          <LogOut class="w-4 h-4" />
-          <span class="hidden sm:inline">Logout</span>
-        </button>
+        <!-- Cashier Profile -->
+        <div class="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+          <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+            <UserIcon class="w-4 h-4" />
+          </div>
+          <div class="hidden sm:block text-left">
+            <div class="text-xs font-bold text-slate-800 leading-tight">
+              {{ authStore.user?.nama_lengkap || authStore.user?.username || 'Kasir' }}
+            </div>
+            <div class="text-[10px] text-slate-400 font-medium">
+              ID User: #{{ authStore.user?.id_user || 1 }}
+            </div>
+          </div>
+
+          <!-- Logout Button -->
+          <button
+            @click="handleLogout"
+            class="ml-1 p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+            title="Keluar / Logout"
+          >
+            <LogOut class="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   </header>
