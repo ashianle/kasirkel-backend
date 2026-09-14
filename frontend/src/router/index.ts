@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
@@ -9,10 +9,10 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
-    path: '/pos',
-    name: 'pos',
-    component: () => import('@/views/PosView.vue'),
-    meta: { requiresAuth: true },
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { guestOnly: true },
   },
   {
     path: '/',
@@ -21,9 +21,39 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/pos',
+    name: 'pos',
+    component: () => import('@/views/PosView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/pembelian',
+    name: 'pembelian',
+    component: () => import('@/views/PembelianView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/supplier',
+    name: 'supplier',
+    component: () => import('@/views/PembelianView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/barang',
     name: 'barang',
     component: () => import('@/views/BarangView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/user',
+    name: 'user',
+    component: () => import('@/views/UserView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/pelanggan',
+    name: 'pelanggan',
+    component: () => import('@/views/PosView.vue'),
     meta: { requiresAuth: true },
   },
   {
@@ -34,7 +64,7 @@ const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/pos',
+    redirect: '/',
   },
 ]
 
@@ -49,7 +79,7 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login' })
   } else if (to.meta.guestOnly && authStore.isAuthenticated) {
-    next({ name: 'pos' })
+    next({ name: 'dashboard' })
   } else {
     next()
   }

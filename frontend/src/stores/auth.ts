@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import apiClient from '@/api/client'
 
 export interface User {
@@ -6,6 +6,7 @@ export interface User {
   username: string
   nama?: string
   nama_lengkap?: string
+  email?: string
   role?: string
   id_sekolah: number
 }

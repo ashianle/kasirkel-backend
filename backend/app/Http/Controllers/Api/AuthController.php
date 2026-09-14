@@ -33,6 +33,35 @@ class AuthController extends Controller
         ]);
     }
 
+    public function register(Request $request)
+    {
+        $validated = $request->validate([
+            'nama_lengkap' => 'required|string|max:100',
+            'username' => 'required|string|max:50|unique:tb_user,username',
+            'email' => 'nullable|email|max:255',
+            'password' => 'required|string|min:6',
+            'id_sekolah' => 'nullable|integer',
+        ]);
+
+        $user = TbUser::create([
+            'id_sekolah' => $validated['id_sekolah'] ?? 1,
+            'id_role' => 3, // Kasir
+            'nama_lengkap' => $validated['nama_lengkap'],
+            'username' => $validated['username'],
+            'email' => $validated['email'] ?? null,
+            'password' => Hash::make($validated['password']),
+            'is_active' => true,
+        ]);
+
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Pendaftaran berhasil',
+            'token' => $token,
+            'user' => $user
+        ], 201);
+    }
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
