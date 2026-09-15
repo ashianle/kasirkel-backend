@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import {
   Store,
   LayoutDashboard,
@@ -26,16 +26,11 @@ const menuItems = [
 </script>
 
 <template>
-  <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800 select-none">
+  <aside class="w-60 bg-white text-gray-700 flex flex-col shrink-0 min-h-screen border-r border-gray-200 select-none">
     <!-- Brand Header -->
-    <div class="h-16 px-6 flex items-center gap-3 border-b border-slate-800">
-      <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-white">
-        <Store class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-sm font-bold text-white tracking-wider uppercase">POS SEKOLAH</div>
-        <div class="text-[10px] text-slate-400 font-medium">Sistem Kasir Multi Tenant</div>
-      </div>
+    <div class="h-14 px-5 flex items-center gap-2.5 border-b border-gray-100">
+      <Store class="w-5 h-5 text-gray-900" />
+      <span class="text-sm font-bold text-gray-900 tracking-wide uppercase">POS SEKOLAH</span>
     </div>
 
     <!-- Navigation Menu -->
@@ -44,25 +39,25 @@ const menuItems = [
         v-for="item in menuItems"
         :key="item.path"
         :to="item.path"
-        class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all group"
+        class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
         :class="
           $route.path === item.path
-            ? 'bg-slate-800 text-white shadow-xs font-bold border-l-2 border-indigo-500'
-            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+            ? 'bg-[#23272f] text-white shadow-xs font-semibold'
+            : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100/80'
         "
       >
         <component
           :is="item.icon"
-          class="w-4 h-4 transition-colors"
-          :class="$route.path === item.path ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'"
+          class="w-4 h-4 shrink-0"
+          :class="$route.path === item.path ? 'text-white' : 'text-gray-600'"
         />
         <span>{{ item.name }}</span>
       </router-link>
     </nav>
 
-    <!-- Footer Info -->
-    <div class="p-4 border-t border-slate-800 text-[11px] text-slate-500 text-center">
-      v2.0 • Multi Tenant POS
+    <!-- Footer Copyright -->
+    <div class="p-3.5 border-t border-gray-100 text-[11px] text-gray-400 text-center">
+      © 2024 POS Sekolah
     </div>
   </aside>
 </template>

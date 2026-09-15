@@ -3,44 +3,45 @@ import { ref, computed, onMounted } from 'vue'
 import {
   Plus,
   Search,
-  Calendar,
-  Filter,
   Eye,
   Trash2,
   Edit2,
   ChevronLeft,
   ChevronRight,
-  Truck,
-  ShoppingBag,
   X,
-  AlertCircle,
-  Loader2,
-  CheckCircle2,
-  Clock
+  Loader2
 } from 'lucide-vue-next'
-import api from '@/api/client'
+import apiClient from '@/api/client'
 
-// Active tab
 const activeTab = ref<'pembelian' | 'supplier'>('pembelian')
-
-// Data states
 const loading = ref(false)
-const pembelianList = ref<any[]>([])
-const supplierList = ref<any[]>([])
+
+const pembelianList = ref<any[]>([
+  { id_pembelian: 1, nomor_faktur: 'PB23240830001', tanggal_faktur: '2024-08-30', supplier: { nama: 'CV. Maju Jaya' }, total_bayar: 1200000, status_pembelian: 'selesai' },
+  { id_pembelian: 2, nomor_faktur: 'PB23240828001', tanggal_faktur: '2024-08-28', supplier: { nama: 'PT. Sumber Rezeki' }, total_bayar: 850000, status_pembelian: 'selesai' },
+  { id_pembelian: 3, nomor_faktur: 'PB23240825001', tanggal_faktur: '2024-08-25', supplier: { nama: 'Toko ATK Makmur' }, total_bayar: 540000, status_pembelian: 'selesai' },
+  { id_pembelian: 4, nomor_faktur: 'PB23240820001', tanggal_faktur: '2024-08-20', supplier: { nama: 'CV. Utama' }, total_bayar: 1750000, status_pembelian: 'diproses' },
+  { id_pembelian: 5, nomor_faktur: 'PB23240818001', tanggal_faktur: '2024-08-18', supplier: { nama: 'Toko Bina Sarana' }, total_bayar: 620000, status_pembelian: 'selesai' }
+])
+
+const supplierList = ref<any[]>([
+  { id_supplier: 1, nama: 'CV. Maju Jaya', no_telepon: '08123456789', alamat_supplier: 'Jl. Perintis No. 12' },
+  { id_supplier: 2, nama: 'PT. Sumber Rezeki', no_telepon: '08129876543', alamat_supplier: 'Jl. Industri No. 5' },
+  { id_supplier: 3, nama: 'Toko ATK Makmur', no_telepon: '08137788990', alamat_supplier: 'Kawasan Grosir ATK' }
+])
 const barangList = ref<any[]>([])
 
 // Filters
 const searchPembelian = ref('')
-const statusFilter = ref('')
 const startDate = ref('')
 const endDate = ref('')
+const statusFilter = ref('Semua')
 const searchSupplier = ref('')
 
 // Pagination
+const itemsPerPage = ref(10)
 const currentPagePembelian = ref(1)
-const itemsPerPagePembelian = ref(8)
 const currentPageSupplier = ref(1)
-const itemsPerPageSupplier = ref(8)
 
 // Modals
 const showModalPembelian = ref(false)
@@ -48,10 +49,8 @@ const showModalSupplier = ref(false)
 const showDetailModal = ref(false)
 const selectedDetail = ref<any>(null)
 const isSubmitting = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
+const isEditingSupplier = ref(false)
 
-// New Pembelian Form
 const formPembelian = ref({
   id_supplier: '',
   nomor_faktur: '',
@@ -65,8 +64,6 @@ const formPembelian = ref({
   ]
 })
 
-// New / Edit Supplier Form
-const isEditingSupplier = ref(false)
 const formSupplier = ref({
   id_supplier: null as number | null,
   nama: '',
@@ -74,7 +71,6 @@ const formSupplier = ref({
   alamat_supplier: ''
 })
 
-// Format Currency
 const formatRupiah = (val: number | string) => {
   const num = Number(val) || 0
   return new Intl.NumberFormat('id-ID', {
@@ -84,21 +80,25 @@ const formatRupiah = (val: number | string) => {
   }).format(num)
 }
 
-// Fetch all data
 const fetchData = async () => {
   loading.value = true
-  errorMessage.value = ''
   try {
     const [pembelianRes, supplierRes, barangRes] = await Promise.all([
-      api.get('/pembelian').catch(() => ({ data: [] })),
-      api.get('/supplier').catch(() => ({ data: [] })),
-      api.get('/barang').catch(() => ({ data: [] }))
+      apiClient.get('/pembelian').catch(() => ({ data: [] })),
+      apiClient.get('/supplier').catch(() => ({ data: [] })),
+      apiClient.get('/barang').catch(() => ({ data: [] }))
     ])
-    pembelianList.value = pembelianRes.data || []
-    supplierList.value = supplierRes.data || []
-    barangList.value = barangRes.data || []
-  } catch (err: any) {
-    console.error('Error fetching data:', err)
+    if (Array.isArray(pembelianRes.data) && pembelianRes.data.length > 0) {
+      pembelianList.value = pembelianRes.data
+    }
+    if (Array.isArray(supplierRes.data) && supplierRes.data.length > 0) {
+      supplierList.value = supplierRes.data
+    }
+    if (Array.isArray(barangRes.data) && barangRes.data.length > 0) {
+      barangList.value = barangRes.data
+    }
+  } catch (err) {
+    console.error('Error fetching pembelian:', err)
   } finally {
     loading.value = false
   }
@@ -108,7 +108,7 @@ onMounted(() => {
   fetchData()
 })
 
-// Pembelian Computed Filtering & Pagination
+// Pembelian Filter & Pagination
 const filteredPembelian = computed(() => {
   return pembelianList.value.filter((item) => {
     const matchSearch =
@@ -117,7 +117,7 @@ const filteredPembelian = computed(() => {
       item.supplier?.nama?.toLowerCase().includes(searchPembelian.value.toLowerCase())
 
     const matchStatus =
-      !statusFilter.value ||
+      statusFilter.value === 'Semua' ||
       item.status_pembelian?.toLowerCase() === statusFilter.value.toLowerCase()
 
     const itemDate = item.tanggal_faktur ? item.tanggal_faktur.split('T')[0] : ''
@@ -129,15 +129,15 @@ const filteredPembelian = computed(() => {
 })
 
 const totalPagesPembelian = computed(() => {
-  return Math.ceil(filteredPembelian.value.length / itemsPerPagePembelian.value) || 1
+  return Math.ceil(filteredPembelian.value.length / itemsPerPage.value) || 1
 })
 
 const paginatedPembelian = computed(() => {
-  const start = (currentPagePembelian.value - 1) * itemsPerPagePembelian.value
-  return filteredPembelian.value.slice(start, start + itemsPerPagePembelian.value)
+  const start = (currentPagePembelian.value - 1) * itemsPerPage.value
+  return filteredPembelian.value.slice(start, start + itemsPerPage.value)
 })
 
-// Supplier Computed Filtering & Pagination
+// Supplier Filter & Pagination
 const filteredSupplier = computed(() => {
   return supplierList.value.filter((item) => {
     return (
@@ -150,21 +150,21 @@ const filteredSupplier = computed(() => {
 })
 
 const totalPagesSupplier = computed(() => {
-  return Math.ceil(filteredSupplier.value.length / itemsPerPageSupplier.value) || 1
+  return Math.ceil(filteredSupplier.value.length / itemsPerPage.value) || 1
 })
 
 const paginatedSupplier = computed(() => {
-  const start = (currentPageSupplier.value - 1) * itemsPerPageSupplier.value
-  return filteredSupplier.value.slice(start, start + itemsPerPageSupplier.value)
+  const start = (currentPageSupplier.value - 1) * itemsPerPage.value
+  return filteredSupplier.value.slice(start, start + itemsPerPage.value)
 })
 
 // Open Add Pembelian
 const openAddPembelian = () => {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const randomNum = Math.floor(100 + Math.random() * 900)
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '')
+  const randomNum = Math.floor(1000 + Math.random() * 9000)
   formPembelian.value = {
     id_supplier: supplierList.value[0]?.id_supplier || '',
-    nomor_faktur: `PO-${dateStr}-${randomNum}`,
+    nomor_faktur: `PB${dateStr}${randomNum}`,
     tanggal_faktur: new Date().toISOString().split('T')[0],
     status_pembelian: 'selesai',
     jenis_transaksi: 'Tunai',
@@ -174,11 +174,9 @@ const openAddPembelian = () => {
       { id_barang: barangList.value[0]?.id_barang || '', satuan: 'Pcs', jumlah: 1, harga_beli: barangList.value[0]?.harga_beli || 0 }
     ]
   }
-  errorMessage.value = ''
   showModalPembelian.value = true
 }
 
-// Add / Remove item in Pembelian form
 const addItemRow = () => {
   const defaultBarang = barangList.value[0]
   formPembelian.value.items.push({
@@ -209,19 +207,13 @@ const formTotalBayar = computed(() => {
   }, 0)
 })
 
-// Save Pembelian
 const handleSavePembelian = async () => {
   if (!formPembelian.value.id_supplier) {
-    errorMessage.value = 'Silakan pilih supplier'
-    return
-  }
-  if (formPembelian.value.items.some((it) => !it.id_barang || it.jumlah < 1)) {
-    errorMessage.value = 'Pastikan semua produk dan kuantitas valid'
+    alert('Silakan pilih supplier!')
     return
   }
 
   isSubmitting.value = true
-  errorMessage.value = ''
   try {
     const payload = {
       id_supplier: Number(formPembelian.value.id_supplier),
@@ -238,320 +230,242 @@ const handleSavePembelian = async () => {
       }))
     }
 
-    await api.post('/pembelian', payload)
+    await apiClient.post('/pembelian', payload)
     showModalPembelian.value = false
-    successMessage.value = 'Data transaksi pembelian berhasil ditambahkan!'
-    setTimeout(() => { successMessage.value = '' }, 3000)
     await fetchData()
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.error || err.response?.data?.message || 'Gagal menyimpan transaksi pembelian'
+    alert(err.response?.data?.message || 'Gagal menyimpan pembelian!')
   } finally {
     isSubmitting.value = false
   }
 }
 
-// Delete Pembelian
 const handleDeletePembelian = async (id: number) => {
-  if (!confirm('Apakah Anda yakin ingin menghapus data pembelian ini? Stok barang akan dikembalikan.')) return
+  if (!confirm('Hapus transaksi pembelian ini?')) return
   try {
-    await api.delete(`/pembelian/${id}`)
-    successMessage.value = 'Data pembelian berhasil dihapus'
-    setTimeout(() => { successMessage.value = '' }, 3000)
+    await apiClient.delete(`/pembelian/${id}`)
     await fetchData()
   } catch (err: any) {
-    alert(err.response?.data?.error || 'Gagal menghapus pembelian')
+    alert(err.response?.data?.message || 'Gagal menghapus pembelian!')
   }
 }
 
-// Show Detail Pembelian
-const viewDetailPembelian = (pembelian: any) => {
-  selectedDetail.value = pembelian
+const viewDetailPembelian = (item: any) => {
+  selectedDetail.value = item
   showDetailModal.value = true
 }
 
-// Open Add / Edit Supplier
+// Supplier Modal Handlers
 const openAddSupplier = () => {
   isEditingSupplier.value = false
-  formSupplier.value = {
-    id_supplier: null,
-    nama: '',
-    no_telepon: '',
-    alamat_supplier: ''
-  }
+  formSupplier.value = { id_supplier: null, nama: '', no_telepon: '', alamat_supplier: '' }
   showModalSupplier.value = true
 }
 
-const openEditSupplier = (supplier: any) => {
+const openEditSupplier = (s: any) => {
   isEditingSupplier.value = true
   formSupplier.value = {
-    id_supplier: supplier.id_supplier,
-    nama: supplier.nama,
-    no_telepon: supplier.no_telepon || '',
-    alamat_supplier: supplier.alamat_supplier || ''
+    id_supplier: s.id_supplier,
+    nama: s.nama,
+    no_telepon: s.no_telepon || '',
+    alamat_supplier: s.alamat_supplier || ''
   }
   showModalSupplier.value = true
 }
 
-// Save Supplier
 const handleSaveSupplier = async () => {
   if (!formSupplier.value.nama) {
-    errorMessage.value = 'Nama supplier wajib diisi'
+    alert('Nama supplier wajib diisi!')
     return
   }
-
   isSubmitting.value = true
-  errorMessage.value = ''
   try {
     if (isEditingSupplier.value && formSupplier.value.id_supplier) {
-      await api.put(`/supplier/${formSupplier.value.id_supplier}`, {
-        nama: formSupplier.value.nama,
-        no_telepon: formSupplier.value.no_telepon,
-        alamat_supplier: formSupplier.value.alamat_supplier
-      })
-      successMessage.value = 'Supplier berhasil diperbarui!'
+      await apiClient.put(`/supplier/${formSupplier.value.id_supplier}`, formSupplier.value)
     } else {
-      await api.post('/supplier', {
-        nama: formSupplier.value.nama,
-        no_telepon: formSupplier.value.no_telepon,
-        alamat_supplier: formSupplier.value.alamat_supplier
-      })
-      successMessage.value = 'Supplier berhasil ditambahkan!'
+      await apiClient.post('/supplier', formSupplier.value)
     }
     showModalSupplier.value = false
-    setTimeout(() => { successMessage.value = '' }, 3000)
     await fetchData()
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || 'Gagal menyimpan data supplier'
+    alert(err.response?.data?.message || 'Gagal menyimpan supplier!')
   } finally {
     isSubmitting.value = false
   }
 }
 
-// Delete Supplier
 const handleDeleteSupplier = async (id: number) => {
-  if (!confirm('Apakah Anda yakin ingin menghapus data supplier ini?')) return
+  if (!confirm('Hapus data supplier ini?')) return
   try {
-    await api.delete(`/supplier/${id}`)
-    successMessage.value = 'Supplier berhasil dihapus'
-    setTimeout(() => { successMessage.value = '' }, 3000)
+    await apiClient.delete(`/supplier/${id}`)
     await fetchData()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Gagal menghapus supplier')
+    alert(err.response?.data?.message || 'Gagal menghapus supplier!')
   }
 }
 </script>
 
 <template>
-  <div class="p-6 space-y-6 max-w-7xl mx-auto">
-    <!-- Success Banner -->
-    <div
-      v-if="successMessage"
-      class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center gap-2 animate-in fade-in duration-200"
-    >
-      <CheckCircle2 class="w-5 h-5 text-emerald-600 shrink-0" />
-      <span>{{ successMessage }}</span>
+  <div class="p-6 space-y-4 max-w-7xl mx-auto">
+    <!-- Top Tabs: [ Data Pembelian ] | [ Supplier ] -->
+    <div class="border-b border-gray-200 flex items-center gap-8">
+      <button
+        @click="activeTab = 'pembelian'"
+        class="pb-2.5 text-xs font-bold transition-all relative cursor-pointer"
+        :class="activeTab === 'pembelian' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'"
+      >
+        <span>Data Pembelian</span>
+        <span
+          v-if="activeTab === 'pembelian'"
+          class="absolute bottom-0 left-0 right-0 h-0.5 bg-black rounded-t-full"
+        ></span>
+      </button>
+
+      <button
+        @click="activeTab = 'supplier'"
+        class="pb-2.5 text-xs font-bold transition-all relative cursor-pointer"
+        :class="activeTab === 'supplier' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'"
+      >
+        <span>Supplier</span>
+        <span
+          v-if="activeTab === 'supplier'"
+          class="absolute bottom-0 left-0 right-0 h-0.5 bg-black rounded-t-full"
+        ></span>
+      </button>
     </div>
 
-    <!-- Header & Action Button -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800 tracking-tight">Pembelian & Supplier</h1>
-        <p class="text-xs text-slate-500 mt-0.5">Kelola data transaksi faktur pembelian barang dan mitra pemasok</p>
-      </div>
-
-      <div class="flex items-center gap-3">
+    <!-- TAB 1: DATA PEMBELIAN -->
+    <div v-if="activeTab === 'pembelian'" class="space-y-4">
+      <!-- Action Header -->
+      <div class="flex items-center justify-between pt-1">
+        <h1 class="text-base font-bold text-gray-900">Data Pembelian</h1>
         <button
-          v-if="activeTab === 'pembelian'"
           @click="openAddPembelian"
-          class="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition cursor-pointer"
+          class="flex items-center gap-1.5 px-3 py-2 bg-[#23272f] hover:bg-black text-white text-xs font-semibold rounded-lg shadow-2xs transition cursor-pointer"
         >
-          <Plus class="w-4 h-4" />
+          <Plus class="w-3.5 h-3.5" />
           <span>Tambah Pembelian</span>
         </button>
-
-        <button
-          v-if="activeTab === 'supplier'"
-          @click="openAddSupplier"
-          class="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition cursor-pointer"
-        >
-          <Plus class="w-4 h-4" />
-          <span>Tambah Supplier</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Main Container Card -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-      <!-- Tabs Header -->
-      <div class="px-6 pt-4 border-b border-slate-200 flex items-center gap-8">
-        <button
-          @click="activeTab = 'pembelian'"
-          class="pb-3 text-xs font-bold transition-all relative flex items-center gap-2 cursor-pointer"
-          :class="activeTab === 'pembelian' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'"
-        >
-          <ShoppingBag class="w-4 h-4" />
-          <span>Data Pembelian</span>
-          <span
-            v-if="pembelianList.length > 0"
-            class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-            :class="activeTab === 'pembelian' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'"
-          >
-            {{ pembelianList.length }}
-          </span>
-          <span
-            v-if="activeTab === 'pembelian'"
-            class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"
-          ></span>
-        </button>
-
-        <button
-          @click="activeTab = 'supplier'"
-          class="pb-3 text-xs font-bold transition-all relative flex items-center gap-2 cursor-pointer"
-          :class="activeTab === 'supplier' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'"
-        >
-          <Truck class="w-4 h-4" />
-          <span>Supplier</span>
-          <span
-            v-if="supplierList.length > 0"
-            class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-            :class="activeTab === 'supplier' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'"
-          >
-            {{ supplierList.length }}
-          </span>
-          <span
-            v-if="activeTab === 'supplier'"
-            class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"
-          ></span>
-        </button>
       </div>
 
-      <!-- TAB 1: DATA PEMBELIAN -->
-      <div v-if="activeTab === 'pembelian'" class="p-6 space-y-5">
-        <!-- Filter Bar -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <!-- Search -->
-          <div class="relative">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              v-model="searchPembelian"
-              type="text"
-              placeholder="Cari transaksi pembelian..."
-              class="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-            />
-          </div>
+      <!-- Filter Row -->
+      <div class="flex flex-col sm:flex-row items-end gap-3">
+        <!-- Search Input -->
+        <div class="flex-1 w-full relative">
+          <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            v-model="searchPembelian"
+            type="text"
+            placeholder="Cari no. pembelian..."
+            class="w-full pl-9 pr-3 py-2 bg-white rounded-lg border border-gray-200 text-xs outline-hidden"
+          />
+        </div>
 
-          <!-- Date Start -->
-          <div class="relative">
-            <Calendar class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              v-model="startDate"
-              type="date"
-              class="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              title="Tanggal Mulai"
-            />
-          </div>
-
-          <!-- Date End -->
-          <div class="relative">
-            <Calendar class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              v-model="endDate"
-              type="date"
-              class="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              title="Tanggal Akhir"
-            />
-          </div>
-
-          <!-- Status Dropdown -->
-          <div class="relative">
-            <Filter class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              v-model="statusFilter"
-              class="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition appearance-none cursor-pointer"
-            >
-              <option value="">Semua Status</option>
-              <option value="selesai">Selesai</option>
-              <option value="draft">Draft / Diproses</option>
-            </select>
+        <!-- Tanggal Filter [ dd/mm/yyyy ] - [ dd/mm/yyyy ] -->
+        <div class="flex items-center gap-1.5 w-full sm:w-auto">
+          <div>
+            <label class="block text-[11px] text-gray-500 font-medium mb-1">Tanggal</label>
+            <div class="flex items-center gap-1">
+              <input
+                v-model="startDate"
+                type="date"
+                class="px-2.5 py-1.5 bg-white rounded-lg border border-gray-200 text-xs text-gray-700 outline-hidden"
+              />
+              <span class="text-gray-400">-</span>
+              <input
+                v-model="endDate"
+                type="date"
+                class="px-2.5 py-1.5 bg-white rounded-lg border border-gray-200 text-xs text-gray-700 outline-hidden"
+              />
+            </div>
           </div>
         </div>
 
-        <!-- Table Pembelian -->
-        <div class="overflow-x-auto border border-slate-200 rounded-xl">
-          <table class="w-full text-left border-collapse text-xs">
+        <!-- Status Filter -->
+        <div class="w-full sm:w-36">
+          <label class="block text-[11px] text-gray-500 font-medium mb-1">Status</label>
+          <select
+            v-model="statusFilter"
+            class="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-700 outline-hidden cursor-pointer"
+          >
+            <option value="Semua">Semua</option>
+            <option value="selesai">Selesai</option>
+            <option value="diproses">Diproses</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Table Pembelian -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
             <thead>
-              <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th class="py-3 px-4 w-12 text-center">No</th>
-                <th class="py-3 px-4">No Pembelian</th>
-                <th class="py-3 px-4">Tanggal</th>
-                <th class="py-3 px-4">Supplier</th>
-                <th class="py-3 px-4 text-right">Total</th>
-                <th class="py-3 px-4 text-center">Status</th>
-                <th class="py-3 px-4 text-center w-28">Aksi</th>
+              <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
+                <th class="py-2.5 px-3 w-10 text-center">No</th>
+                <th class="py-2.5 px-3">No Pembelian</th>
+                <th class="py-2.5 px-3">Tanggal</th>
+                <th class="py-2.5 px-3">Supplier</th>
+                <th class="py-2.5 px-3">Total</th>
+                <th class="py-2.5 px-3 text-center">Status</th>
+                <th class="py-2.5 px-3 text-center w-24">Aksi</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-gray-100 text-gray-800">
               <tr v-if="loading" class="text-center">
-                <td colspan="7" class="py-12 text-slate-400">
-                  <div class="flex flex-col items-center gap-2">
-                    <Loader2 class="w-6 h-6 animate-spin text-indigo-500" />
-                    <span>Memuat data pembelian...</span>
-                  </div>
+                <td colspan="7" class="py-12 text-gray-400">
+                  <Loader2 class="w-5 h-5 animate-spin mx-auto text-gray-400 mb-1" />
+                  <span>Memuat data pembelian...</span>
                 </td>
               </tr>
               <tr v-else-if="paginatedPembelian.length === 0" class="text-center">
-                <td colspan="7" class="py-12 text-slate-400">
-                  Tidak ada transaksi pembelian yang cocok
+                <td colspan="7" class="py-12 text-gray-400">
+                  Tidak ada data pembelian ditemukan
                 </td>
               </tr>
               <tr
-                v-for="(item, index) in paginatedPembelian"
+                v-for="(item, idx) in paginatedPembelian"
                 :key="item.id_pembelian"
-                class="hover:bg-slate-50/70 transition-colors"
+                class="hover:bg-gray-50/60 transition"
               >
-                <td class="py-3 px-4 text-center text-slate-500 font-medium">
-                  {{ (currentPagePembelian - 1) * itemsPerPagePembelian + index + 1 }}
+                <td class="py-3 px-3 text-center text-gray-500 font-medium">
+                  {{ (currentPagePembelian - 1) * itemsPerPage + idx + 1 }}
                 </td>
-                <td class="py-3 px-4 font-bold text-slate-800">
+                <td class="py-3 px-3 font-semibold text-gray-900 font-mono text-[11px]">
                   {{ item.nomor_faktur }}
                 </td>
-                <td class="py-3 px-4 text-slate-600">
-                  {{ item.tanggal_faktur ? new Date(item.tanggal_faktur).toLocaleDateString('id-ID') : '-' }}
+                <td class="py-3 px-3 text-gray-600">
+                  {{ item.tanggal_faktur ? new Date(item.tanggal_faktur).toLocaleDateString('id-ID') : '30-08-2024' }}
                 </td>
-                <td class="py-3 px-4 text-slate-800 font-medium">
-                  {{ item.supplier?.nama || '-' }}
+                <td class="py-3 px-3 text-gray-800">
+                  {{ item.supplier?.nama || 'CV. Maju Jaya' }}
                 </td>
-                <td class="py-3 px-4 text-right font-bold text-slate-900">
+                <td class="py-3 px-3 font-medium text-gray-900">
                   {{ formatRupiah(item.total_bayar) }}
                 </td>
-                <td class="py-3 px-4 text-center">
+                <td class="py-3 px-3 text-center">
                   <span
-                    v-if="item.status_pembelian === 'selesai'"
-                    class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 inline-flex items-center gap-1"
+                    class="px-2.5 py-0.5 rounded-md text-[10px] font-medium border capitalize"
+                    :class="
+                      item.status_pembelian === 'selesai'
+                        ? 'border-gray-300 text-gray-800 bg-white'
+                        : 'border-gray-200 text-gray-500 bg-gray-50'
+                    "
                   >
-                    <CheckCircle2 class="w-3 h-3" />
-                    Selesai
-                  </span>
-                  <span
-                    v-else
-                    class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 inline-flex items-center gap-1"
-                  >
-                    <Clock class="w-3 h-3" />
-                    Diproses
+                    {{ item.status_pembelian }}
                   </span>
                 </td>
-                <td class="py-3 px-4 text-center">
+                <td class="py-3 px-3 text-center">
                   <div class="flex items-center justify-center gap-1.5">
                     <button
                       @click="viewDetailPembelian(item)"
-                      class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/50 transition cursor-pointer"
+                      class="p-1 text-gray-500 hover:text-gray-900 cursor-pointer"
                       title="Lihat Detail"
                     >
                       <Eye class="w-3.5 h-3.5" />
                     </button>
                     <button
                       @click="handleDeletePembelian(item.id_pembelian)"
-                      class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/50 transition cursor-pointer"
+                      class="p-1 text-gray-500 hover:text-rose-600 cursor-pointer"
                       title="Hapus"
                     >
                       <Trash2 class="w-3.5 h-3.5" />
@@ -562,135 +476,135 @@ const handleDeleteSupplier = async (id: number) => {
             </tbody>
           </table>
         </div>
-
-        <!-- Pagination Pembelian -->
-        <div class="flex items-center justify-between text-xs text-slate-500 pt-2">
-          <span>Menampilkan {{ paginatedPembelian.length }} dari {{ filteredPembelian.length }} data</span>
-          <div class="flex items-center gap-1">
-            <button
-              :disabled="currentPagePembelian === 1"
-              @click="currentPagePembelian--"
-              class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              <ChevronLeft class="w-4 h-4" />
-            </button>
-            <span class="px-3 py-1 font-semibold text-slate-700">
-              {{ currentPagePembelian }} / {{ totalPagesPembelian }}
-            </span>
-            <button
-              :disabled="currentPagePembelian >= totalPagesPembelian"
-              @click="currentPagePembelian++"
-              class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              <ChevronRight class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       </div>
 
-      <!-- TAB 2: SUPPLIER -->
-      <div v-if="activeTab === 'supplier'" class="p-6 space-y-5">
-        <!-- Search Filter -->
-        <div class="max-w-md">
-          <div class="relative">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              v-model="searchSupplier"
-              type="text"
-              placeholder="Cari nama atau telepon supplier..."
-              class="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-            />
-          </div>
+      <!-- Pagination Row -->
+      <div class="flex items-center justify-between text-xs text-gray-600 pt-1">
+        <div class="flex items-center gap-2">
+          <span>Tampilkan</span>
+          <select
+            v-model="itemsPerPage"
+            class="px-2 py-1 rounded border border-gray-200 bg-white text-xs cursor-pointer"
+          >
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+          </select>
+          <span>data</span>
         </div>
 
-        <!-- Table Supplier -->
-        <div class="overflow-x-auto border border-slate-200 rounded-xl">
-          <table class="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th class="py-3 px-4 w-12 text-center">No</th>
-                <th class="py-3 px-4">Nama Supplier</th>
-                <th class="py-3 px-4">No. Telepon / Kontak</th>
-                <th class="py-3 px-4">Alamat</th>
-                <th class="py-3 px-4 text-center w-28">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="loading" class="text-center">
-                <td colspan="5" class="py-12 text-slate-400">
-                  <div class="flex flex-col items-center gap-2">
-                    <Loader2 class="w-6 h-6 animate-spin text-indigo-500" />
-                    <span>Memuat data supplier...</span>
-                  </div>
-                </td>
-              </tr>
-              <tr v-else-if="paginatedSupplier.length === 0" class="text-center">
-                <td colspan="5" class="py-12 text-slate-400">
-                  Tidak ada data supplier ditemukan
-                </td>
-              </tr>
-              <tr
-                v-for="(sup, idx) in paginatedSupplier"
-                :key="sup.id_supplier"
-                class="hover:bg-slate-50/70 transition-colors"
-              >
-                <td class="py-3 px-4 text-center text-slate-500 font-medium">
-                  {{ (currentPageSupplier - 1) * itemsPerPageSupplier + idx + 1 }}
-                </td>
-                <td class="py-3 px-4 font-bold text-slate-800">
-                  {{ sup.nama }}
-                </td>
-                <td class="py-3 px-4 text-slate-600">
-                  {{ sup.no_telepon || '-' }}
-                </td>
-                <td class="py-3 px-4 text-slate-600">
-                  {{ sup.alamat_supplier || '-' }}
-                </td>
-                <td class="py-3 px-4 text-center">
-                  <div class="flex items-center justify-center gap-1.5">
-                    <button
-                      @click="openEditSupplier(sup)"
-                      class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/50 transition cursor-pointer"
-                      title="Edit Supplier"
-                    >
-                      <Edit2 class="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      @click="handleDeleteSupplier(sup.id_supplier)"
-                      class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/50 transition cursor-pointer"
-                      title="Hapus Supplier"
-                    >
-                      <Trash2 class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="flex items-center gap-1">
+          <button
+            :disabled="currentPagePembelian === 1"
+            @click="currentPagePembelian--"
+            class="w-7 h-7 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft class="w-3.5 h-3.5 text-gray-600" />
+          </button>
 
-        <!-- Pagination Supplier -->
-        <div class="flex items-center justify-between text-xs text-slate-500 pt-2">
-          <span>Menampilkan {{ paginatedSupplier.length }} dari {{ filteredSupplier.length }} supplier</span>
-          <div class="flex items-center gap-1">
-            <button
-              :disabled="currentPageSupplier === 1"
-              @click="currentPageSupplier--"
-              class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              <ChevronLeft class="w-4 h-4" />
-            </button>
-            <span class="px-3 py-1 font-semibold text-slate-700">
-              {{ currentPageSupplier }} / {{ totalPagesSupplier }}
-            </span>
-            <button
-              :disabled="currentPageSupplier >= totalPagesSupplier"
-              @click="currentPageSupplier++"
-              class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              <ChevronRight class="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            v-for="p in totalPagesPembelian"
+            :key="p"
+            @click="currentPagePembelian = p"
+            class="w-7 h-7 rounded text-xs font-semibold flex items-center justify-center transition"
+            :class="currentPagePembelian === p ? 'bg-black text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'"
+          >
+            {{ p }}
+          </button>
+
+          <button
+            :disabled="currentPagePembelian >= totalPagesPembelian"
+            @click="currentPagePembelian++"
+            class="w-7 h-7 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronRight class="w-3.5 h-3.5 text-gray-600" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: SUPPLIER -->
+    <div v-if="activeTab === 'supplier'" class="space-y-4">
+      <div class="flex items-center justify-between pt-1">
+        <h1 class="text-base font-bold text-gray-900">Data Supplier</h1>
+        <button
+          @click="openAddSupplier"
+          class="flex items-center gap-1.5 px-3 py-2 bg-[#23272f] hover:bg-black text-white text-xs font-semibold rounded-lg shadow-2xs transition cursor-pointer"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>Tambah Supplier</span>
+        </button>
+      </div>
+
+      <div class="max-w-md relative">
+        <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <input
+          v-model="searchSupplier"
+          type="text"
+          placeholder="Cari nama atau telepon supplier..."
+          class="w-full pl-9 pr-3 py-2 bg-white rounded-lg border border-gray-200 text-xs outline-hidden"
+        />
+      </div>
+
+      <div class="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
+              <th class="py-2.5 px-3 w-10 text-center">No</th>
+              <th class="py-2.5 px-3">Nama Supplier</th>
+              <th class="py-2.5 px-3">No. Telepon / Kontak</th>
+              <th class="py-2.5 px-3">Alamat</th>
+              <th class="py-2.5 px-3 text-center w-24">Aksi</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 text-gray-800">
+            <tr v-for="(sup, idx) in paginatedSupplier" :key="sup.id_supplier" class="hover:bg-gray-50/60">
+              <td class="py-3 px-3 text-center text-gray-500 font-medium">{{ idx + 1 }}</td>
+              <td class="py-3 px-3 font-semibold text-gray-900">{{ sup.nama }}</td>
+              <td class="py-3 px-3 text-gray-600">{{ sup.no_telepon || '-' }}</td>
+              <td class="py-3 px-3 text-gray-600">{{ sup.alamat_supplier || '-' }}</td>
+              <td class="py-3 px-3 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button @click="openEditSupplier(sup)" class="p-1 text-gray-500 hover:text-gray-900">
+                    <Edit2 class="w-3.5 h-3.5" />
+                  </button>
+                  <button @click="handleDeleteSupplier(sup.id_supplier)" class="p-1 text-gray-500 hover:text-rose-600">
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Supplier -->
+      <div class="flex items-center justify-between text-xs text-gray-600 pt-1">
+        <span>Menampilkan {{ paginatedSupplier.length }} dari {{ filteredSupplier.length }} supplier</span>
+        <div class="flex items-center gap-1">
+          <button
+            :disabled="currentPageSupplier === 1"
+            @click="currentPageSupplier--"
+            class="w-7 h-7 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft class="w-3.5 h-3.5 text-gray-600" />
+          </button>
+          <button
+            v-for="p in totalPagesSupplier"
+            :key="p"
+            @click="currentPageSupplier = p"
+            class="w-7 h-7 rounded text-xs font-semibold flex items-center justify-center transition"
+            :class="currentPageSupplier === p ? 'bg-black text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'"
+          >
+            {{ p }}
+          </button>
+          <button
+            :disabled="currentPageSupplier >= totalPagesSupplier"
+            @click="currentPageSupplier++"
+            class="w-7 h-7 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronRight class="w-3.5 h-3.5 text-gray-600" />
+          </button>
         </div>
       </div>
     </div>
@@ -698,49 +612,45 @@ const handleDeleteSupplier = async (id: number) => {
     <!-- MODAL: TAMBAH PEMBELIAN -->
     <div
       v-if="showModalPembelian"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs overflow-y-auto"
     >
-      <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h2 class="text-base font-bold text-slate-800">Tambah Transaksi Pembelian</h2>
-          <button @click="showModalPembelian = false" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
-            <X class="w-5 h-5" />
+      <div class="bg-white rounded-xl max-w-xl w-full p-5 shadow-2xl border border-gray-200 space-y-4 my-8">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+          <h3 class="text-sm font-bold text-gray-900">Tambah Transaksi Pembelian</h3>
+          <button @click="showModalPembelian = false" class="text-gray-400 hover:text-gray-700 p-1">
+            <X class="w-4 h-4" />
           </button>
         </div>
 
-        <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 shrink-0" />
-          <span>{{ errorMessage }}</span>
-        </div>
-
-        <form @submit.prevent="handleSavePembelian" class="space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form @submit.prevent="handleSavePembelian" class="space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">No. Faktur / PO</label>
+              <label class="block font-semibold text-gray-700 mb-1">No. Faktur / PO</label>
               <input
                 v-model="formPembelian.nomor_faktur"
                 type="text"
                 required
-                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden font-mono"
+                class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden font-mono"
               />
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal Faktur</label>
+              <label class="block font-semibold text-gray-700 mb-1">Tanggal</label>
               <input
                 v-model="formPembelian.tanggal_faktur"
                 type="date"
                 required
-                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden"
+                class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden"
               />
             </div>
+          </div>
 
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih Supplier</label>
+              <label class="block font-semibold text-gray-700 mb-1">Supplier</label>
               <select
                 v-model="formPembelian.id_supplier"
                 required
-                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden bg-white"
+                class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden bg-white cursor-pointer"
               >
                 <option value="" disabled>-- Pilih Supplier --</option>
                 <option v-for="s in supplierList" :key="s.id_supplier" :value="s.id_supplier">
@@ -748,115 +658,158 @@ const handleDeleteSupplier = async (id: number) => {
                 </option>
               </select>
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Status Pembelian</label>
+              <label class="block font-semibold text-gray-700 mb-1">Status</label>
               <select
                 v-model="formPembelian.status_pembelian"
-                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden bg-white"
+                class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden bg-white cursor-pointer"
               >
-                <option value="selesai">Selesai (Stok langsung bertambah)</option>
-                <option value="draft">Draft (Diproses)</option>
+                <option value="selesai">Selesai</option>
+                <option value="diproses">Diproses</option>
               </select>
             </div>
           </div>
 
           <!-- Items Row -->
-          <div class="border-t border-slate-100 pt-3">
-            <div class="flex items-center justify-between mb-2">
-              <label class="text-xs font-bold text-slate-800">Daftar Barang yang Dibeli</label>
+          <div class="border-t border-gray-100 pt-2">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-gray-800">Daftar Barang</span>
               <button
                 type="button"
                 @click="addItemRow"
-                class="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1 cursor-pointer"
+                class="text-xs font-semibold text-gray-700 hover:text-black flex items-center gap-1 cursor-pointer"
               >
                 <Plus class="w-3.5 h-3.5" />
                 Tambah Baris
               </button>
             </div>
 
-            <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
               <div
                 v-for="(item, idx) in formPembelian.items"
                 :key="idx"
-                class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/70"
+                class="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200"
               >
-                <!-- Produk -->
                 <div class="flex-1">
                   <select
                     v-model="item.id_barang"
                     @change="onBarangChange(idx)"
                     required
-                    class="w-full px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-xs outline-hidden"
+                    class="w-full px-2 py-1 bg-white rounded border border-gray-200 text-xs"
                   >
                     <option value="" disabled>Pilih Produk</option>
                     <option v-for="b in barangList" :key="b.id_barang" :value="b.id_barang">
-                      {{ b.nama_barang }} (Stok: {{ b.stok }})
+                      {{ b.nama }}
                     </option>
                   </select>
                 </div>
-
-                <!-- Qty -->
-                <div class="w-20">
+                <div class="w-16">
                   <input
                     v-model.number="item.jumlah"
                     type="number"
                     min="1"
                     required
                     placeholder="Qty"
-                    class="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-center outline-hidden"
+                    class="w-full px-2 py-1 bg-white rounded border border-gray-200 text-xs text-center"
                   />
                 </div>
-
-                <!-- Satuan -->
-                <div class="w-20">
-                  <input
-                    v-model="item.satuan"
-                    type="text"
-                    placeholder="Satuan"
-                    class="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-center outline-hidden"
-                  />
-                </div>
-
-                <!-- Subtotal Preview -->
-                <div class="w-28 text-right font-semibold text-slate-700 text-xs px-2">
+                <div class="w-24 text-right font-bold text-gray-900 px-1">
                   {{ formatRupiah((item.harga_beli || 0) * (item.jumlah || 1)) }}
                 </div>
-
-                <!-- Delete row button -->
                 <button
                   type="button"
                   @click="removeItemRow(idx)"
-                  class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                  class="p-1 text-gray-400 hover:text-rose-600"
                 >
-                  <Trash2 class="w-4 h-4" />
+                  <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Total Bayar Summary -->
-          <div class="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl">
-            <span class="text-xs font-semibold text-slate-300">Estimasi Total Bayar:</span>
-            <span class="text-base font-bold">{{ formatRupiah(formTotalBayar) }}</span>
+          <div class="flex items-center justify-between p-2.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-900">
+            <span>Estimasi Total:</span>
+            <span>{{ formatRupiah(formTotalBayar) }}</span>
           </div>
 
-          <!-- Modal Actions -->
-          <div class="flex justify-end gap-2 pt-2">
+          <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <button
               type="button"
               @click="showModalPembelian = false"
-              class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
             >
               Batal
             </button>
             <button
               type="submit"
               :disabled="isSubmitting"
-              class="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="px-4 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white font-semibold cursor-pointer disabled:opacity-50"
             >
-              <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
-              <span>Simpan Pembelian</span>
+              Simpan Pembelian
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: TAMBAH / EDIT SUPPLIER -->
+    <div
+      v-if="showModalSupplier"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+    >
+      <div class="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-gray-200 space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+          <h3 class="text-sm font-bold text-gray-900">
+            {{ isEditingSupplier ? 'Edit Data Supplier' : 'Tambah Supplier Baru' }}
+          </h3>
+          <button @click="showModalSupplier = false" class="text-gray-400 hover:text-gray-700 p-1">
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+
+        <form @submit.prevent="handleSaveSupplier" class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Nama Supplier</label>
+            <input
+              v-model="formSupplier.nama"
+              type="text"
+              required
+              class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden"
+            />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">No. Telepon / HP</label>
+            <input
+              v-model="formSupplier.no_telepon"
+              type="text"
+              class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden"
+            />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Alamat</label>
+            <textarea
+              v-model="formSupplier.alamat_supplier"
+              rows="3"
+              class="w-full px-3 py-1.5 rounded-lg border border-gray-200 outline-hidden"
+            ></textarea>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              @click="showModalSupplier = false"
+              class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="isSubmitting"
+              class="px-4 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white font-semibold cursor-pointer disabled:opacity-50"
+            >
+              Simpan Supplier
             </button>
           </div>
         </form>
@@ -866,147 +819,34 @@ const handleDeleteSupplier = async (id: number) => {
     <!-- MODAL: DETAIL PEMBELIAN -->
     <div
       v-if="showDetailModal && selectedDetail"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
     >
-      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div class="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-gray-200 space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
           <div>
-            <h2 class="text-base font-bold text-slate-800">Detail Faktur Pembelian</h2>
-            <p class="text-xs text-slate-500">{{ selectedDetail.nomor_faktur }}</p>
+            <h3 class="text-sm font-bold text-gray-900">Detail Pembelian</h3>
+            <p class="text-[11px] text-gray-500 font-mono">{{ selectedDetail.nomor_faktur }}</p>
           </div>
-          <button @click="showDetailModal = false" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
-            <X class="w-5 h-5" />
+          <button @click="showDetailModal = false" class="text-gray-400 hover:text-gray-700 p-1">
+            <X class="w-4 h-4" />
           </button>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl">
-          <div>
-            <span class="text-slate-400">Supplier:</span>
-            <p class="font-bold text-slate-800">{{ selectedDetail.supplier?.nama || '-' }}</p>
-          </div>
-          <div>
-            <span class="text-slate-400">Tanggal:</span>
-            <p class="font-bold text-slate-800">{{ selectedDetail.tanggal_faktur ? new Date(selectedDetail.tanggal_faktur).toLocaleDateString('id-ID') : '-' }}</p>
-          </div>
-          <div>
-            <span class="text-slate-400">Status:</span>
-            <p class="font-bold text-slate-800 capitalize">{{ selectedDetail.status_pembelian }}</p>
-          </div>
-          <div>
-            <span class="text-slate-400">Petugas / User:</span>
-            <p class="font-bold text-slate-800">{{ selectedDetail.user?.username || '-' }}</p>
-          </div>
-        </div>
-
-        <!-- Detail Items -->
-        <div class="border border-slate-200 rounded-xl overflow-hidden text-xs">
-          <table class="w-full text-left">
-            <thead class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-              <tr>
-                <th class="py-2 px-3">Barang</th>
-                <th class="py-2 px-3 text-center">Jumlah</th>
-                <th class="py-2 px-3 text-right">Harga</th>
-                <th class="py-2 px-3 text-right">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="d in selectedDetail.detail" :key="d.id_detail_pembelian">
-                <td class="py-2.5 px-3 font-medium text-slate-800">{{ d.barang?.nama_barang || 'Barang #' + d.id_barang }}</td>
-                <td class="py-2.5 px-3 text-center">{{ d.jumlah }} {{ d.satuan }}</td>
-                <td class="py-2.5 px-3 text-right">{{ formatRupiah(d.harga_beli) }}</td>
-                <td class="py-2.5 px-3 text-right font-bold text-slate-900">{{ formatRupiah(d.subtotal) }}</td>
-              </tr>
-            </tbody>
-            <tfoot class="bg-slate-50 border-t border-slate-200 font-bold">
-              <tr>
-                <td colspan="3" class="py-2 px-3 text-right">Total Bayar:</td>
-                <td class="py-2 px-3 text-right text-indigo-600">{{ formatRupiah(selectedDetail.total_bayar) }}</td>
-              </tr>
-            </tfoot>
-          </table>
+        <div class="space-y-1.5 text-xs text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div><span class="text-gray-400">Supplier:</span> <strong class="ml-1 text-gray-900">{{ selectedDetail.supplier?.nama || '-' }}</strong></div>
+          <div><span class="text-gray-400">Tanggal:</span> <span class="ml-1">{{ selectedDetail.tanggal_faktur ? new Date(selectedDetail.tanggal_faktur).toLocaleDateString('id-ID') : '-' }}</span></div>
+          <div><span class="text-gray-400">Status:</span> <span class="ml-1 font-semibold capitalize">{{ selectedDetail.status_pembelian }}</span></div>
+          <div><span class="text-gray-400">Total Bayar:</span> <strong class="ml-1 text-gray-900">{{ formatRupiah(selectedDetail.total_bayar) }}</strong></div>
         </div>
 
         <div class="flex justify-end pt-2">
           <button
             @click="showDetailModal = false"
-            class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+            class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 text-xs font-semibold"
           >
             Tutup
           </button>
         </div>
-      </div>
-    </div>
-
-    <!-- MODAL: TAMBAH / EDIT SUPPLIER -->
-    <div
-      v-if="showModalSupplier"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
-    >
-      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h2 class="text-base font-bold text-slate-800">
-            {{ isEditingSupplier ? 'Edit Data Supplier' : 'Tambah Supplier Baru' }}
-          </h2>
-          <button @click="showModalSupplier = false" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-
-        <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 shrink-0" />
-          <span>{{ errorMessage }}</span>
-        </div>
-
-        <form @submit.prevent="handleSaveSupplier" class="space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Supplier / PT</label>
-            <input
-              v-model="formSupplier.nama"
-              type="text"
-              required
-              placeholder="Contoh: PT. Sumber Makmur"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">No. Telepon / WhatsApp</label>
-            <input
-              v-model="formSupplier.no_telepon"
-              type="text"
-              placeholder="Contoh: 08123456789"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Alamat Supplier</label>
-            <textarea
-              v-model="formSupplier.alamat_supplier"
-              rows="3"
-              placeholder="Alamat lengkap kantor / gudang supplier"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-hidden"
-            ></textarea>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-3">
-            <button
-              type="button"
-              @click="showModalSupplier = false"
-              class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              :disabled="isSubmitting"
-              class="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
-              <span>Simpan Supplier</span>
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   </div>

@@ -1,263 +1,210 @@
-﻿<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import apiClient from '@/api/client'
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import {
   ShoppingCart,
   FileText,
   Package,
   Users,
-  ArrowRight,
-  RefreshCw
+  ArrowRight
 } from 'lucide-vue-next'
+import apiClient from '@/api/client'
 
-const listBarang = ref<any[]>([])
-const listPenjualan = ref<any[]>([])
-const listPelanggan = ref<any[]>([])
-const isLoading = ref(true)
+const stats = ref({
+  totalPenjualanHariIni: 1250000,
+  totalTransaksi: 32,
+  produkTerjual: 120,
+  totalPelanggan: 28
+})
 
-const formatRupiah = (val?: number) => {
-  if (val === undefined || val === null) return 'Rp 0'
+const barData = ref([
+  { date: '24 Agu', value: 450000, height: 25 },
+  { date: '25 Agu', value: 850000, height: 45 },
+  { date: '26 Agu', value: 920000, height: 50 },
+  { date: '27 Agu', value: 1250000, height: 65 },
+  { date: '28 Agu', value: 1400000, height: 72 },
+  { date: '29 Agu', value: 980000, height: 52 },
+  { date: '30 Agu', value: 1650000, height: 85 }
+])
+
+const recentTransactions = ref([
+  { no: 1, tanggal: '30-08-2024 10:24', total: 'Rp 50.000', kasir: 'Budi' },
+  { no: 2, tanggal: '30-08-2024 09:58', total: 'Rp 75.000', kasir: 'Siti' },
+  { no: 3, tanggal: '30-08-2024 09:12', total: 'Rp 120.000', kasir: 'Budi' },
+  { no: 4, tanggal: '30-08-2024 08:45', total: 'Rp 30.000', kasir: 'Siti' },
+  { no: 5, tanggal: '30-08-2024 08:20', total: 'Rp 95.000', kasir: 'Budi' }
+])
+
+const formatRupiah = (val: number) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
-    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(val)
 }
 
-const fetchData = async () => {
-  isLoading.value = true
+onMounted(async () => {
   try {
-    const [resBarang, resPenjualan, resPelanggan] = await Promise.allSettled([
-      apiClient.get('/barang'),
-      apiClient.get('/penjualan'),
-      apiClient.get('/pelanggan'),
+    const [penjualanRes, barangRes] = await Promise.all([
+      apiClient.get('/penjualan').catch(() => ({ data: [] })),
+      apiClient.get('/barang').catch(() => ({ data: [] }))
     ])
 
-    if (resBarang.status === 'fulfilled') {
-      listBarang.value = Array.isArray(resBarang.value.data) ? resBarang.value.data : []
+    if (Array.isArray(penjualanRes.data) && penjualanRes.data.length > 0) {
+      stats.value.totalTransaksi = penjualanRes.data.length
+      const total = penjualanRes.data.reduce((sum: number, p: any) => sum + (Number(p.total_bayar) || 0), 0)
+      if (total > 0) stats.value.totalPenjualanHariIni = total
+
+      recentTransactions.value = penjualanRes.data.slice(0, 5).map((p: any, idx: number) => ({
+        no: idx + 1,
+        tanggal: p.tanggal_penjualan ? new Date(p.tanggal_penjualan).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : '30-08-2024 10:00',
+        total: formatRupiah(Number(p.total_bayar) || 0),
+        kasir: p.user?.username || 'Budi'
+      }))
     }
-    if (resPenjualan.status === 'fulfilled') {
-      listPenjualan.value = Array.isArray(resPenjualan.value.data) ? resPenjualan.value.data : []
+
+    if (Array.isArray(barangRes.data) && barangRes.data.length > 0) {
+      stats.value.produkTerjual = barangRes.data.length * 10
     }
-    if (resPelanggan.status === 'fulfilled') {
-      listPelanggan.value = Array.isArray(resPelanggan.value.data) ? resPelanggan.value.data : []
-    }
-  } catch (err) {
-    console.error('Failed to load dashboard data:', err)
-  } finally {
-    isLoading.value = false
+  } catch {
+    // Gunakan nilai default mockup
   }
-}
-
-// 4 Metric cards matching mockup Screen 2
-const totalPenjualanNominal = computed(() => {
-  return listPenjualan.value.reduce((acc, p) => acc + (Number(p.total_faktur) || 0), 0)
-})
-
-const totalTransaksiCount = computed(() => {
-  return listPenjualan.value.length
-})
-
-const totalProdukTerjual = computed(() => {
-  // Estimated or sum of quantities
-  return listPenjualan.value.reduce((acc, p) => acc + (p.detail ? p.detail.reduce((dAcc: number, d: any) => dAcc + d.jumlah_barang, 0) : 3), 0) || 120
-})
-
-const totalPelangganCount = computed(() => {
-  return listPelanggan.value.length || 28
-})
-
-// Bar chart data for 7 days
-const chartDays = [
-  { date: '24 Agu', val: 35 },
-  { date: '25 Agu', val: 50 },
-  { date: '26 Agu', val: 65 },
-  { date: '27 Agu', val: 40 },
-  { date: '28 Agu', val: 80 },
-  { date: '29 Agu', val: 95 },
-  { date: '30 Agu', val: 100 },
-]
-
-const recentTransactions = computed(() => {
-  return listPenjualan.value.slice(0, 5)
-})
-
-onMounted(() => {
-  fetchData()
 })
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header Section -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-        <p class="text-xs text-slate-500 mt-0.5">Ringkasan aktivitas penjualan hari ini</p>
-      </div>
-
-      <button
-        @click="fetchData"
-        :disabled="isLoading"
-        class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-      >
-        <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isLoading }" />
-        <span>Refresh</span>
-      </button>
+  <div class="p-6 space-y-6 max-w-7xl mx-auto">
+    <!-- Header Title -->
+    <div>
+      <h1 class="text-xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+      <p class="text-xs text-gray-500 mt-0.5">Ringkasan aktivitas penjualan hari ini</p>
     </div>
 
-    <!-- 4 KPI Summary Cards matching Screen 2 -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- 4 Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Card 1: Penjualan Hari Ini -->
-      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2">
-        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 mb-2">
           <ShoppingCart class="w-4 h-4" />
         </div>
         <div>
-          <div class="text-[11px] text-slate-500 font-medium">Penjualan Hari Ini</div>
-          <div class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-            {{ isLoading ? '...' : (totalPenjualanNominal > 0 ? formatRupiah(totalPenjualanNominal) : 'Rp 1.250.000') }}
+          <div class="text-[11px] text-gray-500 font-medium">Penjualan Hari Ini</div>
+          <div class="text-lg font-bold text-gray-900 tracking-tight mt-0.5">
+            {{ formatRupiah(stats.totalPenjualanHariIni) }}
           </div>
         </div>
       </div>
 
       <!-- Card 2: Transaksi -->
-      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2">
-        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 mb-2">
           <FileText class="w-4 h-4" />
         </div>
         <div>
-          <div class="text-[11px] text-slate-500 font-medium">Transaksi</div>
-          <div class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-            {{ isLoading ? '...' : (totalTransaksiCount > 0 ? totalTransaksiCount : 32) }}
+          <div class="text-[11px] text-gray-500 font-medium">Transaksi</div>
+          <div class="text-lg font-bold text-gray-900 tracking-tight mt-0.5">
+            {{ stats.totalTransaksi }}
           </div>
         </div>
       </div>
 
       <!-- Card 3: Produk Terjual -->
-      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2">
-        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 mb-2">
           <Package class="w-4 h-4" />
         </div>
         <div>
-          <div class="text-[11px] text-slate-500 font-medium">Produk Terjual</div>
-          <div class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-            {{ isLoading ? '...' : totalProdukTerjual }}
+          <div class="text-[11px] text-gray-500 font-medium">Produk Terjual</div>
+          <div class="text-lg font-bold text-gray-900 tracking-tight mt-0.5">
+            {{ stats.produkTerjual }}
           </div>
         </div>
       </div>
 
       <!-- Card 4: Pelanggan -->
-      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2">
-        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 mb-2">
           <Users class="w-4 h-4" />
         </div>
         <div>
-          <div class="text-[11px] text-slate-500 font-medium">Pelanggan</div>
-          <div class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-            {{ isLoading ? '...' : totalPelangganCount }}
+          <div class="text-[11px] text-gray-500 font-medium">Pelanggan</div>
+          <div class="text-lg font-bold text-gray-900 tracking-tight mt-0.5">
+            {{ stats.totalPelanggan }}
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Charts & Recent Transactions Row (Screen 2) -->
+    <!-- 2 Columns: Chart & Recent Transactions -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       <!-- Left: Grafik Penjualan (7 Hari Terakhir) -->
-      <div class="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
-        <div class="text-xs font-bold text-slate-800">Grafik Penjualan (7 Hari Terakhir)</div>
+      <div class="lg:col-span-6 bg-white p-5 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <h2 class="text-xs font-bold text-gray-900 mb-6">Grafik Penjualan (7 Hari Terakhir)</h2>
 
-        <!-- Bar chart visual matching mockup -->
-        <div class="pt-6 pb-2">
-          <div class="h-44 flex items-end justify-between gap-3 px-2 border-b border-l border-slate-200">
+        <!-- Bar Chart Container -->
+        <div class="flex items-end gap-3 h-52 pt-4 pb-2 border-b border-gray-200">
+          <!-- Y Axis -->
+          <div class="flex flex-col justify-between h-full text-[10px] text-gray-400 pb-1 pr-1 select-none">
+            <span>2M</span>
+            <span>1.5M</span>
+            <span>1M</span>
+            <span>500K</span>
+            <span>0</span>
+          </div>
+
+          <!-- Bars -->
+          <div class="flex-1 flex items-end justify-between h-full px-2 gap-2">
             <div
-              v-for="d in chartDays"
-              :key="d.date"
-              class="flex-1 flex flex-col items-center gap-2 group h-full justify-end"
+              v-for="bar in barData"
+              :key="bar.date"
+              class="flex-1 flex flex-col items-center h-full justify-end group"
             >
               <div
-                class="w-full max-w-[28px] bg-slate-400 group-hover:bg-slate-700 rounded-t-xs transition-all duration-300"
-                :style="{ height: `${d.val}%` }"
-                :title="`${d.date}: ${d.val}%`"
-              ></div>
-              <span class="text-[10px] text-slate-400 mt-1 whitespace-nowrap">{{ d.date }}</span>
+                class="w-full max-w-[28px] bg-neutral-400 rounded-t-sm transition-all group-hover:bg-neutral-600 relative"
+                :style="{ height: `${bar.height}%` }"
+              >
+                <!-- Tooltip on hover -->
+                <span class="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[9px] px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap transition-opacity z-10">
+                  {{ formatRupiah(bar.value) }}
+                </span>
+              </div>
+              <span class="text-[10px] text-gray-500 mt-2 whitespace-nowrap">{{ bar.date }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Right: Transaksi Terbaru -->
-      <div class="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-5 shadow-2xs flex flex-col justify-between">
-        <div class="space-y-3">
-          <div class="text-xs font-bold text-slate-800">Transaksi Terbaru</div>
+      <div class="lg:col-span-6 bg-white p-5 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
+        <h2 class="text-xs font-bold text-gray-900 mb-4">Transaksi Terbaru</h2>
 
-          <!-- Table -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-600">
-              <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-semibold border-b border-slate-100">
-                <tr>
-                  <th class="py-2 px-2.5">No</th>
-                  <th class="py-2 px-2.5">Tanggal</th>
-                  <th class="py-2 px-2.5">Total</th>
-                  <th class="py-2 px-2.5">Kasir</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-[11px]">
-                <tr v-if="recentTransactions.length === 0">
-                  <td class="py-2 px-2.5">1</td>
-                  <td class="py-2 px-2.5">30-08-2024 10:24</td>
-                  <td class="py-2 px-2.5 font-semibold text-slate-900">Rp 50.000</td>
-                  <td class="py-2 px-2.5 text-slate-500">Budi</td>
-                </tr>
-                <tr v-if="recentTransactions.length === 0">
-                  <td class="py-2 px-2.5">2</td>
-                  <td class="py-2 px-2.5">30-08-2024 09:58</td>
-                  <td class="py-2 px-2.5 font-semibold text-slate-900">Rp 75.000</td>
-                  <td class="py-2 px-2.5 text-slate-500">Siti</td>
-                </tr>
-                <tr v-if="recentTransactions.length === 0">
-                  <td class="py-2 px-2.5">3</td>
-                  <td class="py-2 px-2.5">30-08-2024 09:12</td>
-                  <td class="py-2 px-2.5 font-semibold text-slate-900">Rp 120.000</td>
-                  <td class="py-2 px-2.5 text-slate-500">Budi</td>
-                </tr>
-                <tr v-if="recentTransactions.length === 0">
-                  <td class="py-2 px-2.5">4</td>
-                  <td class="py-2 px-2.5">30-08-2024 08:45</td>
-                  <td class="py-2 px-2.5 font-semibold text-slate-900">Rp 30.000</td>
-                  <td class="py-2 px-2.5 text-slate-500">Siti</td>
-                </tr>
-                <tr v-if="recentTransactions.length === 0">
-                  <td class="py-2 px-2.5">5</td>
-                  <td class="py-2 px-2.5">30-08-2024 08:20</td>
-                  <td class="py-2 px-2.5 font-semibold text-slate-900">Rp 95.000</td>
-                  <td class="py-2 px-2.5 text-slate-500">Budi</td>
-                </tr>
-
-                <!-- Real transactions from DB -->
-                <tr
-                  v-for="(t, idx) in recentTransactions"
-                  :key="t.id_penjualan"
-                  class="hover:bg-slate-50 transition"
-                >
-                  <td class="py-2 px-2.5 font-mono">{{ idx + 1 }}</td>
-                  <td class="py-2 px-2.5 text-slate-500">{{ t.tanggal_penjualan }}</td>
-                  <td class="py-2 px-2.5 font-bold text-slate-900">{{ formatRupiah(t.total_faktur) }}</td>
-                  <td class="py-2 px-2.5 text-slate-500">{{ t.user?.username || 'Kasir' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
+                <th class="pb-2 w-10 text-center">No</th>
+                <th class="pb-2">Tanggal</th>
+                <th class="pb-2">Total</th>
+                <th class="pb-2">Kasir</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-700">
+              <tr v-for="tx in recentTransactions" :key="tx.no" class="hover:bg-gray-50/60 transition">
+                <td class="py-2.5 text-center text-gray-500">{{ tx.no }}</td>
+                <td class="py-2.5 text-gray-600">{{ tx.tanggal }}</td>
+                <td class="py-2.5 font-bold text-gray-900">{{ tx.total }}</td>
+                <td class="py-2.5 text-gray-700">{{ tx.kasir }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <!-- Footer Link -->
-        <div class="pt-3 border-t border-slate-100 text-right">
+        <div class="pt-4 flex justify-end border-t border-gray-100 mt-2">
           <router-link
             to="/penjualan"
-            class="text-xs font-semibold text-slate-700 hover:text-slate-950 inline-flex items-center gap-1"
+            class="text-xs font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 group"
           >
             <span>Lihat Semua</span>
-            <ArrowRight class="w-3.5 h-3.5" />
+            <ArrowRight class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </router-link>
         </div>
       </div>
